@@ -73,6 +73,15 @@ h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); margin-bottom: 28px; }
 .btn.ghost { color: var(--accent); }
 .btn:hover { filter: brightness(1.08); }
 
+/* Photo next to the name: text on the left, round photo on the right */
+.hero-top { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; }
+.hero-text { min-width: 0; }
+.photo {
+  width: clamp(160px, 22vw, 240px); height: auto; aspect-ratio: 1; max-width: 100%;
+  border-radius: 50%; object-fit: cover;
+  border: 4px solid var(--surface); box-shadow: 0 0 0 1px var(--line);
+}
+
 /* 4. KEY NUMBERS: a 4-column strip that becomes 2 columns on phones */
 .numbers {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
@@ -122,12 +131,14 @@ footer { padding-block: 32px; color: var(--muted); font-size: .9rem; border-top:
   section { padding-block: 48px; }
   .numbers { grid-template-columns: 1fr 1fr; }
   .about, .case .cols { grid-template-columns: 1fr; gap: 16px; }
+  .hero-top { grid-template-columns: 1fr; gap: 24px; }
+  .photo { order: -1; width: 120px; }
 }
 
 /* Gentle fade-in on load, switched off for people who prefer less motion */
 @media (prefers-reduced-motion: no-preference) {
-  .hero > * { animation: rise .6s ease-out both; }
-  .hero > *:nth-child(2) { animation-delay: .08s; }
-  .hero > *:nth-child(3) { animation-delay: .16s; }
+  .hero-text > *, .photo { animation: rise .6s ease-out both; }
+  .hero-text > *:nth-child(2) { animation-delay: .08s; }
+  .hero-text > *:nth-child(3) { animation-delay: .16s; }
   @keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
 }
