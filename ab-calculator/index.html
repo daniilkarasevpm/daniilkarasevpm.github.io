@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>Калькулятор A/B тестов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow working column, tabs on top, inputs as two side-by-side variant cards, verdict + interval chart below */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5d6678;
+  --line: #dde1e8;
+  --a: #4a5d8c;
+  --b: #c2701a;
+  --good: #1f7a4d;
+  --good-bg: #e3f3ea;
+  --warn: #8a5a00;
+  --warn-bg: #fbf0d9;
+  --bad: #a33a2a;
+  --bad-bg: #f8e4e0;
+  --focus: #4a5d8c;
+  --display: "Unbounded", "IBM Plex Sans", system-ui, sans-serif;
+  --text: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --surface: #1a1f28; --fg: #e6e9ef; --muted: #9aa3b4; --line: #2b323e;
+    --a: #8fa3d6; --b: #e9a25a; --good: #6fd19c; --good-bg: #173326; --warn: #e8c070; --warn-bg: #352a12;
+    --bad: #f08f7f; --bad-bg: #3a1d19; --focus: #8fa3d6; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1f28; --fg: #e6e9ef; --muted: #9aa3b4; --line: #2b323e;
+  --a: #8fa3d6; --b: #e9a25a; --good: #6fd19c; --good-bg: #173326; --warn: #e8c070; --warn-bg: #352a12;
+  --bad: #f08f7f; --bad-bg: #3a1d19; --focus: #8fa3d6; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--text); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 48px;
+}
+.wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 24px; }
+.home { display: inline-block; margin-bottom: 14px; font-size: 13px; color: var(--muted); text-decoration: none; }
+.home:hover { color: var(--fg); text-decoration: underline; }
+header h1 { font-family: var(--display); font-weight: 600; font-size: clamp(22px, 4vw, 30px); margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+header p { margin: 0; color: var(--muted); max-width: 60ch; }
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 4px; width: fit-content; max-width: 100%; flex-wrap: wrap; }
+.tabs button { font: 500 14px var(--text); border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 7px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.panel { display: grid; gap: 20px; }
+.variants { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .variants { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.card h2 { margin: 0; font: 600 13px var(--text); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot.a { background: var(--a); } .dot.b { background: var(--b); }
+label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+input, select { font: 500 16px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; width: 100%; font-variant-numeric: tabular-nums; }
+.rate { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; }
+.rate small { font: 400 13px var(--text); color: var(--muted); margin-left: 6px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.row > label { flex: 1 1 160px; }
+.verdict { border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; }
+.verdict.good { background: var(--good-bg); color: var(--good); }
+.verdict.warn { background: var(--warn-bg); color: var(--warn); }
+.verdict.bad { background: var(--bad-bg); color: var(--bad); }
+.verdict strong { font: 600 17px var(--text); }
+.verdict span { color: var(--fg); font-size: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stat { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; }
+.stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat .v { font: 500 19px var(--mono); font-variant-numeric: tabular-nums; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.chart h3, .explain h3 { margin: 0 0 8px; font: 600 14px var(--text); }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.explain { border-top: 1px solid var(--line); padding-top: 16px; font-size: 14px; color: var(--muted); }
+.explain dl { margin: 0; display: grid; gap: 10px; }
+.explain dt { color: var(--fg); font-weight: 600; }
+.explain dd { margin: 0; max-width: 65ch; }
+.big { font: 600 clamp(28px, 6vw, 40px) var(--display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.note { font-size: 13px; color: var(--muted); }
+.example { font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .verdict, .stat .v { transition: background-color .2s, color .2s; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a class="home" href="../">← Даниил Карасёв, Product Manager</a>
+    <h1>Калькулятор A/B тестов</h1>
+    <p>Проверьте, настоящая ли разница между вариантами, или посчитайте, сколько посетителей нужно до запуска теста.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-result" aria-selected="true" aria-controls="p-result">Проверить результат</button>
+    <button role="tab" id="tab-size" aria-selected="false" aria-controls="p-size">Размер выборки</button>
+  </div>
+
+  <!-- RESULT -->
+  <section class="panel" id="p-result" role="tabpanel" aria-labelledby="tab-result">
+    <p class="example">Заполнено примером. Замените цифры на свои.</p>
+    <div class="variants">
+      <div class="card">
+        <h2><span class="dot a"></span>Вариант A (контроль)</h2>
+        <label>Посетители<input id="na" type="number" min="1" step="1" value="5000" inputmode="numeric"></label>
+        <label>Конверсии<input id="ca" type="number" min="0" step="1" value="400" inputmode="numeric"></label>
+        <div class="rate" id="ra">8,00%<small>конверсия</small></div>
+      </div>
+      <div class="card">
+        <h2><span class="dot b"></span>Вариант B (новый)</h2>
+        <label>Посетители<input id="nb" type="number" min="1" step="1" value="5000" inputmode="numeric"></label>
+        <label>Конверсии<input id="cb" type="number" min="0" step="1" value="470" inputmode="numeric"></label>
+        <div class="rate" id="rb">9,40%<small>конверсия</small></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Уровень уверенности
+        <select id="conf">
+          <option value="0.90">90%</option>
+          <option value="0.95" selected>95% (стандарт)</option>
+          <option value="0.99">99%</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="verdict" id="verdict" aria-live="polite"></div>
+
+    <div class="stats">
+      <div class="stat"><span class="k">Прирост B к A</span><span class="v" id="s-uplift">—</span></div>
+      <div class="stat"><span class="k">p-value</span><span class="v" id="s-p">—</span></div>
+      <div class="stat"><span class="k">Разница, п.п.</span><span class="v" id="s-diff">—</span></div>
+    </div>
+
+    <div class="chart">
+      <h3>Где, скорее всего, находится настоящая конверсия</h3>
+      <svg id="ci" viewBox="0 0 600 130" role="img" aria-label="Доверительные интервалы конверсии A и B"></svg>
+      <p id="ci-note"></p>
+    </div>
+
+    <div class="explain">
+      <h3>Что значат эти цифры</h3>
+      <dl>
+        <dt>Прирост</dt>
+        <dd>На сколько процентов конверсия B выше или ниже, чем у A. Например, 8% → 9,4% это +17,5%.</dd>
+        <dt>p-value</dt>
+        <dd>Шанс увидеть такую же или бо́льшую разницу, если на самом деле варианты одинаковые. Чем меньше, тем меньше похоже на случайность. При уверенности 95% порог 0,05.</dd>
+        <dt>Интервал</dt>
+        <dd>Полоска на графике показывает диапазон, где почти наверняка лежит настоящая конверсия варианта. Если полоски сильно перекрываются, разница может быть случайной.</dd>
+        <dt>Метод</dt>
+        <dd>Двусторонний z-тест для двух долей. Подходит для метрик «да/нет»: купил или нет, зарегистрировался или нет.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- SAMPLE SIZE -->
+  <section class="panel" id="p-size" role="tabpanel" aria-labelledby="tab-size" hidden>
+    <p class="example">Заполнено примером. Замените цифры на свои.</p>
+    <div class="card">
+      <div class="row">
+        <label>Текущая конверсия, %<input id="base" type="number" min="0.01" max="99" step="0.1" value="8" inputmode="decimal"></label>
+        <label>Какой прирост хотите поймать, %<input id="mde" type="number" min="0.1" step="0.5" value="10" inputmode="decimal"></label>
+      </div>
+      <div class="row">
+        <label>Уровень уверенности
+          <select id="alpha">
+            <option value="0.10">90%</option>
+            <option value="0.05" selected>95% (стандарт)</option>
+            <option value="0.01">99%</option>
+          </select>
+        </label>
+        <label>Мощность теста
+          <select id="power">
+            <option value="0.8" selected>80% (стандарт)</option>
+            <option value="0.9">90%</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Посетителей в день на весь тест (необязательно)<input id="daily" type="number" min="0" step="1" value="2000" inputmode="numeric"></label>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="k">На каждый вариант</span><span class="v big" id="z-per">—</span></div>
+      <div class="stat"><span class="k">Всего (A + B)</span><span class="v" id="z-total">—</span></div>
+      <div class="stat"><span class="k">Длительность</span><span class="v" id="z-days">—</span></div>
+    </div>
+    <p class="note" id="z-note"></p>
+
+    <div class="explain">
+      <h3>Что значат эти поля</h3>
+      <dl>
+        <dt>Прирост, который хотите поймать</dt>
+        <dd>Самое маленькое улучшение, ради которого стоит что-то менять. Указывается относительно текущей конверсии: 10% от 8% значит 8% → 8,8%. Чем меньше прирост, тем больше нужно посетителей.</dd>
+        <dt>Уверенность</dt>
+        <dd>Насколько вы готовы рисковать увидеть «победу», которой нет. 95% значит, что такая ложная победа случится не чаще 1 раза из 20.</dd>
+        <dt>Мощность</dt>
+        <dd>Шанс заметить улучшение, если оно действительно есть. 80% значит, что настоящий эффект найдётся в 4 тестах из 5.</dd>
+        <dt>Совет</dt>
+        <dd>Решите размер выборки заранее и не останавливайте тест, как только увидели «значимо». Частые подглядывания дают ложные победы. И держите тест минимум неделю, чтобы захватить и будни, и выходные.</dd>
+      </dl>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const fmt = (x, d = 2) => x.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtInt = x => Math.round(x).toLocaleString('ru-RU');
+
+  // Normal CDF (Zelen & Severo / erf approximation)
+  function erf(x) {
+    const s = Math.sign(x); x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+  const cdf = z => 0.5 * (1 + erf(z / Math.SQRT2));
+  // Inverse normal CDF (Acklam)
+  function inv(p) {
+    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+    const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+    const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+    const pl = 0.02425;
+    let q, r;
+    if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    if (p > 1 - pl) { q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    q = p - 0.5; r = q * q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+
+  // Tabs
+  const tabs = [['tab-result', 'p-result'], ['tab-size', 'p-size']];
+  tabs.forEach(([t, p]) => $(t).addEventListener('click', () => {
+    tabs.forEach(([t2, p2]) => { $(t2).setAttribute('aria-selected', t2 === t); $(p2).hidden = p2 !== p; });
+  }));
+
+  // Significance
+  function result() {
+    const na = +$('na').value, ca = +$('ca').value, nb = +$('nb').value, cb = +$('cb').value;
+    const conf = +$('conf').value;
+    const v = $('verdict');
+    const bad = (msg) => {
+      v.className = 'verdict bad'; v.innerHTML = '<strong>Проверьте цифры</strong><span>' + msg + '</span>';
+      ['s-uplift', 's-p', 's-diff'].forEach(i => $(i).textContent = '—');
+      $('ra').firstChild.textContent = '—'; $('rb').firstChild.textContent = '—';
+      $('ci').innerHTML = ''; $('ci-note').textContent = '';
+    };
+    if (!(na > 0 && nb > 0)) return bad('Число посетителей должно быть больше нуля.');
+    if (ca < 0 || cb < 0 || ca > na || cb > nb) return bad('Конверсий не может быть больше, чем посетителей, и меньше нуля.');
+
+    const pa = ca / na, pb = cb / nb;
+    $('ra').firstChild.textContent = fmt(pa * 100) + '%';
+    $('rb').firstChild.textContent = fmt(pb * 100) + '%';
+
+    const pool = (ca + cb) / (na + nb);
+    const se = Math.sqrt(pool * (1 - pool) * (1 / na + 1 / nb));
+    const z = se > 0 ? (pb - pa) / se : 0;
+    const p = se > 0 ? 2 * (1 - cdf(Math.abs(z))) : 1;
+    const alpha = 1 - conf;
+    const uplift = pa > 0 ? (pb - pa) / pa : NaN;
+
+    $('s-uplift').textContent = isFinite(uplift) ? (uplift >= 0 ? '+' : '') + fmt(uplift * 100, 1) + '%' : '—';
+    $('s-p').textContent = p < 0.0001 ? '< 0,0001' : fmt(p, 4);
+    $('s-diff').textContent = ((pb - pa) >= 0 ? '+' : '') + fmt((pb - pa) * 100);
+
+    const pct = Math.round(conf * 100);
+    if (p < alpha && pb > pa) {
+      v.className = 'verdict good';
+      v.innerHTML = '<strong>B лучше, и это не похоже на случайность</strong><span>Разница значима при уверенности ' + pct + '%. Вариант B можно выкатывать.</span>';
+    } else if (p < alpha && pb < pa) {
+      v.className = 'verdict bad';
+      v.innerHTML = '<strong>B хуже, и это не похоже на случайность</strong><span>Разница значима при уверенности ' + pct + '%. Лучше остаться на варианте A.</span>';
+    } else {
+      v.className = 'verdict warn';
+      v.innerHTML = '<strong>Пока нельзя сказать, что есть разница</strong><span>p-value ' + fmt(p, 3) + ' выше порога ' + fmt(alpha, 2) + '. Разница может быть случайной. Наберите больше посетителей или признайте, что эффекта нет.</span>';
+    }
+    drawCI(pa, na, pb, nb, conf);
+  }
+
+  function drawCI(pa, na, pb, nb, conf) {
+    const zc = inv(1 - (1 - conf) / 2);
+    const ia = [pa - zc * Math.sqrt(pa * (1 - pa) / na), pa + zc * Math.sqrt(pa * (1 - pa) / na)];
+    const ib = [pb - zc * Math.sqrt(pb * (1 - pb) / nb), pb + zc * Math.sqrt(pb * (1 - pb) / nb)];
+    let lo = Math.max(0, Math.min(ia[0], ib[0])), hi = Math.min(1, Math.max(ia[1], ib[1]));
+    const pad = (hi - lo) * 0.15 || 0.01; lo = Math.max(0, lo - pad); hi = Math.min(1, hi + pad);
+    const L = 40, R = 580, X = v => L + (v - lo) / (hi - lo) * (R - L);
+    const ticks = 5; let g = '';
+    for (let i = 0; i <= ticks; i++) {
+      const tv = lo + (hi - lo) * i / ticks, x = X(tv);
+      g += `<line x1="${x}" y1="12" x2="${x}" y2="100" stroke="var(--line)" stroke-width="1"/>`;
+      g += `<text x="${x}" y="120" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--muted)">${fmt(tv * 100, 1)}%</text>`;
+    }
+    const bar = (iv, p, y, col, name) => {
+      const x1 = X(Math.max(lo, iv[0])), x2 = X(Math.min(hi, iv[1]));
+      return `<text x="${L - 12}" y="${y + 5}" text-anchor="end" font-size="14" font-weight="600" font-family="var(--text)" fill="${col}">${name}</text>`
+        + `<rect x="${x1}" y="${y - 7}" width="${Math.max(2, x2 - x1)}" height="14" rx="7" fill="${col}" opacity="0.28"/>`
+        + `<circle cx="${X(p)}" cy="${y}" r="6" fill="${col}"/>`;
+    };
+    $('ci').innerHTML = g + bar(ia, pa, 36, 'var(--a)', 'A') + bar(ib, pb, 76, 'var(--b)', 'B');
+    const overlap = ia[1] >= ib[0] && ib[1] >= ia[0];
+    $('ci-note').textContent = 'Точка показывает измеренную конверсию, полоска диапазон с уверенностью ' + Math.round(conf * 100) + '%. '
+      + (overlap ? 'Полоски перекрываются: это подсказка, что разница может быть случайной (точный ответ даёт p-value выше).' : 'Полоски не перекрываются: разница уверенная.');
+  }
+
+  // Sample size
+  function size() {
+    const base = +$('base').value / 100, mde = +$('mde').value / 100;
+    const alpha = +$('alpha').value, power = +$('power').value, daily = +$('daily').value;
+    const p1 = base, p2 = base * (1 + mde);
+    if (!(p1 > 0 && p1 < 1) || !(mde > 0) || p2 >= 1) {
+      ['z-per', 'z-total', 'z-days'].forEach(i => $(i).textContent = '—');
+      $('z-note').textContent = 'Проверьте цифры: конверсия должна быть от 0 до 100%, а конверсия с приростом не может превышать 100%.';
+      return;
+    }
+    const za = inv(1 - alpha / 2), zb = inv(power), pbar = (p1 + p2) / 2;
+    const n = Math.ceil(Math.pow(za * Math.sqrt(2 * pbar * (1 - pbar)) + zb * Math.sqrt(p1 * (1 - p1) + p2 * (1 - p2)), 2) / Math.pow(p2 - p1, 2));
+    $('z-per').textContent = fmtInt(n);
+    $('z-total').textContent = fmtInt(n * 2);
+    if (daily > 0) {
+      const days = Math.ceil(n * 2 / daily);
+      $('z-days').textContent = days + ' ' + plural(days, 'день', 'дня', 'дней');
+    } else $('z-days').textContent = '—';
+    $('z-note').textContent = 'Тест сможет заметить рост конверсии с ' + fmt(p1 * 100) + '% до ' + fmt(p2 * 100) + '% или больше. Если такой рост есть, вы увидите его с шансом ' + Math.round(power * 100) + '%.'
+      + (daily > 0 && Math.ceil(n * 2 / daily) < 7 ? ' Даже если выборка набирается быстрее, держите тест хотя бы 7 дней.' : '');
+  }
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+
+  ['na', 'ca', 'nb', 'cb', 'conf'].forEach(i => $(i).addEventListener('input', result));
+  ['base', 'mde', 'alpha', 'power', 'daily'].forEach(i => $(i).addEventListener('input', size));
+  result(); size();
+})();
+</script>
+</body>
+</html>
